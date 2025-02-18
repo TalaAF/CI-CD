@@ -1,7 +1,8 @@
-package com.example.payroll;
+package com.example.payroll.employeeService;
 
 import java.util.Objects;
 
+import com.example.payroll.departmentService.Department;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
@@ -13,7 +14,7 @@ import jakarta.persistence.ManyToOne;
 
 @Entity
 @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
-class Employee {
+public class Employee {
 
   private @Id @GeneratedValue Long id;
   private String name;
@@ -24,10 +25,10 @@ class Employee {
   @JoinColumn(name = "department_id", nullable = false)
   private Department department;
 
-  Employee() {
+  public Employee() {
   }
 
-  Employee(String name, String role, String email) {
+  public Employee(String name, String role, String email) {
 
     this.name = name;
     this.role = role;

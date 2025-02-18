@@ -1,4 +1,4 @@
-package com.example.payroll;
+package com.example.payroll.employeeService;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
@@ -7,10 +7,10 @@ import org.springframework.hateoas.server.RepresentationModelAssembler;
 import org.springframework.stereotype.Component;
 
 @Component
-class EmployeeModelAssembler implements RepresentationModelAssembler<Employee, EntityModel<Employee>> {
+class EmployeeModelAssembler implements RepresentationModelAssembler<EmployeeDTO, EntityModel<EmployeeDTO>> {
 
   @Override
-  public EntityModel<Employee> toModel(Employee employee) {
+  public EntityModel<EmployeeDTO> toModel(EmployeeDTO employee) {
 
     return EntityModel.of(employee, //
         linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel(),

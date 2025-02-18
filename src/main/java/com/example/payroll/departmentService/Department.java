@@ -1,9 +1,10 @@
-package com.example.payroll;
+package com.example.payroll.departmentService;
 
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+import com.example.payroll.employeeService.Employee;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
@@ -23,9 +24,9 @@ public class Department {
     @OneToMany(mappedBy="department", cascade = CascadeType.ALL)
     private Set<Employee> employees;
 
-    Department() {}
+    public Department() {}
 
-    Department(String name, String location) {
+    public Department(String name, String location) {
         this.name = name;
         this.location = location;
         this.employees = new HashSet<>();

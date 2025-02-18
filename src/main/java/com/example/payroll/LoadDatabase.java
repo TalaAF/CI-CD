@@ -6,6 +6,11 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.example.payroll.departmentService.Department;
+import com.example.payroll.departmentService.DepartmentRepository;
+import com.example.payroll.employeeService.Employee;
+import com.example.payroll.employeeService.EmployeeRepository;
+
 @Configuration
 class LoadDatabase {
 

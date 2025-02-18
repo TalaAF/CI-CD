@@ -1,4 +1,4 @@
-package com.example.payroll;
+package com.example.payroll.departmentService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -6,11 +6,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
-class EmployeeNotFoundAdvice {
+class DepartmentNotFoundAdvice {
 
-  @ExceptionHandler(EmployeeNotFoundException.class)
+  @ExceptionHandler(DepartmentNotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  String employeeNotFoundHandler(EmployeeNotFoundException ex) {
+  String employeeNotFoundHandler(DepartmentNotFoundException ex) {
     return ex.getMessage();
   }
 }
