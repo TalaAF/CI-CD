@@ -29,67 +29,66 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public CollectionModel<EntityModel<EmployeeDTO>> findAll() {
         List<EntityModel<EmployeeDTO>> employees = repository.findAll().stream() //
-        .map(t -> EmployeeMapper.mapEmployeetoEmployeeDTO(t)) //
-        .map(assembler::toModel) //
-        .collect(Collectors.toList());
-  
-    return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
-  
+                .map(EmployeeMapper::toDTO) //
+                .map(assembler::toModel) //
+                .collect(Collectors.toList());
+
+        return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
+
     }
 
     @Override
     public ResponseEntity<?> newEmployee(EmployeeDTO newEmployee) {
-         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
-        .orElseThrow(() -> new DepartmentNotFoundException(newEmployee.getDepartmentName()));
+        Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
+                .orElseThrow(() -> new DepartmentNotFoundException(newEmployee.getDepartmentName()));
 
-    
-    Employee employee = EmployeeMapper.mapEmployeeDTOtoEmployee(newEmployee, dep);
-    employee = repository.save(employee);
-    EntityModel<EmployeeDTO> entityModel = assembler.toModel(EmployeeMapper.mapEmployeetoEmployeeDTO(employee));
+        Employee employee = EmployeeMapper.toEntity(newEmployee, dep);
+        employee = repository.save(employee);
+        EntityModel<EmployeeDTO> entityModel = assembler.toModel(EmployeeMapper.toDTO(employee));
 
-    return ResponseEntity //
-        .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri()) //
-        .body(entityModel);    
+        return ResponseEntity //
+                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri()) //
+                .body(entityModel);
     }
 
     @Override
-    public EntityModel<EmployeeDTO> findById(Long id) {        
+    public EntityModel<EmployeeDTO> findById(Long id) {
         Employee employee = repository.findById(id) //
-        .orElseThrow(() -> new EmployeeNotFoundException(id));
+                .orElseThrow(() -> new EmployeeNotFoundException(id));
 
-    return assembler.toModel(EmployeeMapper.mapEmployeetoEmployeeDTO(employee));
+        return assembler.toModel(EmployeeMapper.toDTO(employee));
     }
 
     @Override
     public EntityModel<EmployeeDTO> findByEmail(String email) {
         Employee employee = repository.findByEmail(email) //
-        .orElseThrow(() -> new EmployeeNotFoundException(email));
-        return assembler.toModel(EmployeeMapper.mapEmployeetoEmployeeDTO(employee));
+                .orElseThrow(() -> new EmployeeNotFoundException(email));
+        return assembler.toModel(EmployeeMapper.toDTO(employee));
     }
 
     @Override
     public ResponseEntity<?> save(EmployeeDTO newEmployee, Long id) {
         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
-        .orElseThrow(() -> new DepartmentNotFoundException(newEmployee.getDepartmentName()));
+                .orElseThrow(() -> new DepartmentNotFoundException(newEmployee.getDepartmentName()));
 
-    Employee newEmploye = EmployeeMapper.mapEmployeeDTOtoEmployee(newEmployee, dep);
-    Employee updatedEmployee = repository.findById(id) //
-        .map(employee -> {
-          employee.setName(newEmployee.getName());
-          employee.setRole(newEmployee.getRole());
-          employee.setEmail(newEmployee.getEmail());
-          employee.setDepartment(dep);
-          return repository.save(employee);
-        }) //
-        .orElseGet(() -> {
-          return repository.save(newEmploye);
-        });
+        Employee newEmploye = EmployeeMapper.toEntity(newEmployee, dep);
+        Employee updatedEmployee = repository.findById(id) //
+                .map(employee -> {
+                    employee.setName(newEmployee.getName());
+                    employee.setRole(newEmployee.getRole());
+                    employee.setEmail(newEmployee.getEmail());
+                    employee.setDepartment(dep);
+                    return repository.save(employee);
+                }) //
+                .orElseGet(() -> {
+                    return repository.save(newEmploye);
+                });
 
-    EntityModel<EmployeeDTO> entityModel = assembler.toModel(EmployeeMapper.mapEmployeetoEmployeeDTO(updatedEmployee));
+        EntityModel<EmployeeDTO> entityModel = assembler.toModel(EmployeeMapper.toDTO(updatedEmployee));
 
-    return ResponseEntity //
-        .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri()) //
-        .body(entityModel);
+        return ResponseEntity //
+                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri()) //
+                .body(entityModel);
     }
 
     @Override
