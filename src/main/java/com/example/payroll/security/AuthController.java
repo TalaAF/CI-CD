@@ -10,32 +10,22 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.payroll.departmentService.Department;
-import com.example.payroll.departmentService.DepartmentNotFoundException;
-import com.example.payroll.departmentService.DepartmentRepository;
-import com.example.payroll.employeeService.Employee;
-import com.example.payroll.employeeService.EmployeeDTO;
-import com.example.payroll.employeeService.EmployeeMapper;
-import com.example.payroll.employeeService.EmployeeRepository;
-
 import lombok.Data;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    private final EmployeeRepository employeeRepository;
-    private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
 
-    public AuthController(EmployeeRepository userRepository, DepartmentRepository departmentRepository, PasswordEncoder passwordEncoder,
+    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
                           AuthenticationManager authenticationManager, JwtUtil jwtUtil,
                           CustomUserDetailsService userDetailsService) {
-        this.employeeRepository = userRepository;
-        this.departmentRepository = departmentRepository;
+        this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
@@ -44,18 +34,15 @@ public class AuthController {
 
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody EmployeeDTO employeed) {
-        Department dep = departmentRepository.findByName(employeed.getDepartmentName())
-                .orElseThrow(() -> new DepartmentNotFoundException(employeed.getDepartmentName()));
-
-        Employee employee = EmployeeMapper.toEntity(employeed, dep);
-
-        if (employeeRepository.findByUsername(employee.getUsername()).isPresent()) {
+    public ResponseEntity<String> registerUser(@RequestBody User user) {
+       
+        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Username already exists");
         }
-        employee.setPassword(passwordEncoder.encode(employee.getPassword()));
-        employee.setRole("ROLE_USER");
-        employeeRepository.save(employee);
+
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        user.setRole("ROLE_USER");
+        userRepository.save(user);
         return ResponseEntity.ok("User registered successfully");
     }
     @PostMapping("/login")
