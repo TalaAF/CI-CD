@@ -17,19 +17,20 @@ import lombok.Data;
 public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
                           AuthenticationManager authenticationManager, JwtUtil jwtUtil,
-                          CustomUserDetailsService userDetailsService) {
+                          CustomUserDetailsService userDetailsService, RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
+        this.refreshTokenService = refreshTokenService;
     }
 
 
@@ -46,15 +47,27 @@ public class AuthController {
         return ResponseEntity.ok("User registered successfully");
     }
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody AuthenticationRequest request) {
+    public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-        final String jwt = jwtUtil.generateToken(userDetails);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        String jwt = jwtUtil.generateToken(userDetails);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(userRepository.findByUsername(request.getUsername()).get().getId());
 
-        return ResponseEntity.ok(jwt);
+        return ResponseEntity.ok(new AuthenticationResponse(jwt, refreshToken.getToken()));
     }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
+    RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(request.getRefreshToken());
+    UserDetails userDetails = userDetailsService.loadUserByUsername(refreshToken.getUser().getUsername());
+
+    String newAccessToken = jwtUtil.generateToken(userDetails);
+
+    return ResponseEntity.ok(new AuthenticationResponse(newAccessToken, request.getRefreshToken()));
+}
+
 }
 
 @Data
@@ -63,4 +76,19 @@ class AuthenticationRequest {
     private String password;
 }
 
+@Data
+class AuthenticationResponse {
+    private String accessToken;
+    private String refreshToken;
+
+    public AuthenticationResponse(String accessToken, String refreshToken) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+    }
+}
+@Data
+class RefreshTokenRequest {
+    private String refreshToken;
+    
+}
 
