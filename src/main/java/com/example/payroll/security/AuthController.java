@@ -1,9 +1,13 @@
 package com.example.payroll.security;
 
+import java.util.Collections;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,8 +27,8 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                          AuthenticationManager authenticationManager, JwtUtil jwtUtil,
-                          CustomUserDetailsService userDetailsService, RefreshTokenService refreshTokenService) {
+            AuthenticationManager authenticationManager, JwtUtil jwtUtil,
+            CustomUserDetailsService userDetailsService, RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
@@ -33,10 +37,9 @@ public class AuthController {
         this.refreshTokenService = refreshTokenService;
     }
 
-
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@RequestBody User user) {
-       
+
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Username already exists");
         }
@@ -45,27 +48,36 @@ public class AuthController {
         userRepository.save(user);
         return ResponseEntity.ok("User registered successfully");
     }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+        // Retrieve user once
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(user.getUsername(), request.getPassword()));
+
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                user.getUsername(),
+                user.getPassword(),
+                Collections.singletonList(new SimpleGrantedAuthority(user.getRole())));
+
         String jwt = jwtUtil.generateToken(userDetails);
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(userRepository.findByUsername(request.getUsername()).get().getId());
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
         return ResponseEntity.ok(new AuthenticationResponse(jwt, refreshToken.getToken()));
     }
 
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenRequest request) {
-    RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(request.getRefreshToken());
-    UserDetails userDetails = userDetailsService.loadUserByUsername(refreshToken.getUser().getUsername());
+        RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(request.getRefreshToken());
+        UserDetails userDetails = userDetailsService.loadUserByUsername(refreshToken.getUser().getUsername());
 
-    String newAccessToken = jwtUtil.generateToken(userDetails);
+        String newAccessToken = jwtUtil.generateToken(userDetails);
 
-    return ResponseEntity.ok(new AuthenticationResponse(newAccessToken, request.getRefreshToken()));
-}
+        return ResponseEntity.ok(new AuthenticationResponse(newAccessToken, request.getRefreshToken()));
+    }
 
 }
 
@@ -85,9 +97,9 @@ class AuthenticationResponse {
         this.refreshToken = refreshToken;
     }
 }
+
 @Data
 class RefreshTokenRequest {
     private String refreshToken;
-    
-}
 
+}
