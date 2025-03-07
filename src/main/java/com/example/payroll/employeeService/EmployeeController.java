@@ -29,7 +29,7 @@ class EmployeeController {
   }
   
   @GetMapping("/employees/{id}")
-  EntityModel<EmployeeDTO> one(@PathVariable Long id) {
+  ResponseEntity<?> one(@PathVariable Long id) {
       return employeeService.findById(id);    
   }
 

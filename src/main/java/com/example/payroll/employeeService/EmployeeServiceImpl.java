@@ -6,25 +6,37 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.hateoas.IanaLinkRelations;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import com.example.payroll.departmentService.Department;
 import com.example.payroll.departmentService.DepartmentNotFoundException;
 import com.example.payroll.departmentService.DepartmentRepository;
+import com.example.payroll.security.User;
+import com.example.payroll.security.UserRepository;
 
 @Service
 public class EmployeeServiceImpl implements EmployeeService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmployeeServiceImpl.class);
+
     @Autowired
     private EmployeeRepository repository;
     @Autowired
     private DepartmentRepository departmentRepository;
     @Autowired
     private EmployeeModelAssembler assembler;
+    @Autowired
+    private UserRepository userRepository;
 
     @Override
     public CollectionModel<EntityModel<EmployeeDTO>> findAll() {
@@ -52,11 +64,22 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    public EntityModel<EmployeeDTO> findById(Long id) {
+    public ResponseEntity<?> findById(Long id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName(); // Get username directly
+
+        User authenticatedUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         Employee employee = repository.findById(id) //
                 .orElseThrow(() -> new EmployeeNotFoundException(id));
 
-        return assembler.toModel(EmployeeMapper.toDTO(employee));
+        if (!authenticatedUser.getRole().equals("ROLE_ADMIN")
+                && !authenticatedUser.getId().equals(employee.getUser().getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You are not allowed to access this data.");
+        }
+
+        return ResponseEntity.ok(assembler.toModel(EmployeeMapper.toDTO(employee)));
     }
 
     @Override
