@@ -12,12 +12,20 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 @RestController
 class EmployeeController {
 
   @Autowired
   private EmployeeService employeeService;
 
+  @Operation(summary = "Get all employees", description = "Fetches a list of all employees.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved users")
+    })
   @GetMapping("/employees")
   CollectionModel<EntityModel<EmployeeDTO>> all() {
     return employeeService.findAll();
