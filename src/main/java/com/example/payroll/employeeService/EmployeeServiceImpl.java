@@ -19,8 +19,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import com.example.payroll.departmentService.Department;
-import com.example.payroll.departmentService.DepartmentNotFoundException;
 import com.example.payroll.departmentService.DepartmentRepository;
+import com.example.payroll.exceptions.ResourceNotFoundException;
 import com.example.payroll.security.User;
 import com.example.payroll.security.UserRepository;
 
@@ -52,7 +52,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public ResponseEntity<?> newEmployee(EmployeeDTO newEmployee) {
         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
-                .orElseThrow(() -> new DepartmentNotFoundException(newEmployee.getDepartmentName()));
+                .orElseThrow(() -> new ResourceNotFoundException("Department with Name "+ newEmployee.getDepartmentName() + " not found."));
 
         Employee employee = EmployeeMapper.toEntity(newEmployee, dep);
         employee = repository.save(employee);
@@ -72,7 +72,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         Employee employee = repository.findById(id) //
-                .orElseThrow(() -> new EmployeeNotFoundException(id));
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with ID " + id + " not found."));
 
         if (!authenticatedUser.getRole().equals("ROLE_ADMIN")
                 && !authenticatedUser.getId().equals(employee.getUser().getId())) {
@@ -85,14 +85,14 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public EntityModel<EmployeeDTO> findByEmail(String email) {
         Employee employee = repository.findByEmail(email) //
-                .orElseThrow(() -> new EmployeeNotFoundException(email));
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with EMAIL "+email+" not found."));
         return assembler.toModel(EmployeeMapper.toDTO(employee));
     }
 
     @Override
     public ResponseEntity<?> save(EmployeeDTO newEmployee, Long id) {
         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
-                .orElseThrow(() -> new DepartmentNotFoundException(newEmployee.getDepartmentName()));
+                .orElseThrow(() -> new ResourceNotFoundException("Department with Name "+ newEmployee.getDepartmentName() + " not found."));
 
         Employee newEmploye = EmployeeMapper.toEntity(newEmployee, dep);
         Employee updatedEmployee = repository.findById(id) //

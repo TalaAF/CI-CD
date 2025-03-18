@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.payroll.exceptions.UsernameAlreadyExistsException;
+
+import jakarta.validation.Valid;
 import lombok.Data;
 
 @RestController
@@ -38,10 +41,10 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody User user) {
+    public ResponseEntity<String> registerUser(@Valid @RequestBody User user) {
 
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
-            return ResponseEntity.badRequest().body("Username already exists");
+            throw new UsernameAlreadyExistsException("Username already exists");
         }
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));

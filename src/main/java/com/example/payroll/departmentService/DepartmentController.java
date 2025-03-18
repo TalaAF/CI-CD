@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.payroll.exceptions.ResourceNotFoundException;
+
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 @RestController
@@ -60,7 +62,7 @@ public class DepartmentController {
     EntityModel<Department> one(@PathVariable Long id) {
     
       Department Department = repository.findById(id) //
-          .orElseThrow(() -> new DepartmentNotFoundException(id));
+          .orElseThrow(() -> new ResourceNotFoundException("Department with ID "+id+" not found"));
     
           return assembler.toModel(Department);
     }
