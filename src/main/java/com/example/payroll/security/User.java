@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -20,6 +21,7 @@ public class User {
     
     @Column(unique = true)
     @NotBlank(message = "Username cannot be blank")
+    @Email(message = "Username must be an email")
     private String username;
     
     @Size(min = 6, message = "Password must be at least 6 characters long")

@@ -14,34 +14,40 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.payroll.EmailService;
 import com.example.payroll.exceptions.UsernameAlreadyExistsException;
 
+import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
 import lombok.Data;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
     private final RefreshTokenService refreshTokenService;
+    private final EmailService emailService;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager, JwtUtil jwtUtil,
-            CustomUserDetailsService userDetailsService, RefreshTokenService refreshTokenService) {
+            CustomUserDetailsService userDetailsService, RefreshTokenService refreshTokenService,
+            EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
         this.refreshTokenService = refreshTokenService;
+        this.emailService = emailService;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@Valid @RequestBody User user) {
+    public ResponseEntity<String> registerUser(@Valid @RequestBody User user) throws MessagingException{
 
         if (userRepository.findByUsername(user.getUsername()).isPresent()) {
             throw new UsernameAlreadyExistsException("Username already exists");
@@ -49,6 +55,13 @@ public class AuthController {
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
+
+        // Send welcome email
+        emailService.sendWelcomeEmail(user.getUsername(), user.getUsername());
+
+        // Notify admin
+        emailService.sendAdminNotification("admin@example.com", "New user registered: " + user.getUsername());
+
         return ResponseEntity.ok("User registered successfully");
     }
 

@@ -30,9 +30,9 @@ class LoadDatabase {
     departmentRepository.save(department);
     departmentRepository.save(department2);
 
-    User user = new User("Bilbo", passwordEncoder.encode("bilbo"), "ROLE_ADMIN");
+    User user = new User("Bilbo@gmail.com", passwordEncoder.encode("bilbo"), "ROLE_ADMIN");
     userRepository.save(user);
-    User user2 = new User("Frodo", passwordEncoder.encode("frodo"), "ROLE_USER");
+    User user2 = new User("Frodo@gmail.com", passwordEncoder.encode("frodo"), "ROLE_USER");
     userRepository.save(user2);
     
     Employee employee = new Employee("Bilbo Baggins", "burglar", "bilbo@email.com");
