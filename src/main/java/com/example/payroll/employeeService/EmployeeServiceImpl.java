@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.payroll.departmentService.Department;
@@ -37,41 +38,43 @@ public class EmployeeServiceImpl implements EmployeeService {
     private EmployeeModelAssembler assembler;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public CollectionModel<EntityModel<EmployeeDTO>> findAll() {
-        List<EntityModel<EmployeeDTO>> employees = repository.findAll().stream() //
-                .map(EmployeeMapper::toDTO) //
-                .map(assembler::toModel) //
+        List<EntityModel<EmployeeDTO>> employees = repository.findAll().stream()
+                .map(EmployeeMapper::toDTO)
+                .map(assembler::toModel)
                 .collect(Collectors.toList());
 
         return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
-
     }
 
     @Override
     public ResponseEntity<?> newEmployee(EmployeeDTO newEmployee) {
         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
-                .orElseThrow(() -> new ResourceNotFoundException("Department with Name "+ newEmployee.getDepartmentName() + " not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Department with Name " + newEmployee.getDepartmentName() + " not found."));
 
-        Employee employee = EmployeeMapper.toEntity(newEmployee, dep);
+        Employee employee = EmployeeMapper.toEntity(newEmployee, dep, passwordEncoder, userRepository);
         employee = repository.save(employee);
+
         EntityModel<EmployeeDTO> entityModel = assembler.toModel(EmployeeMapper.toDTO(employee));
 
-        return ResponseEntity //
-                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri()) //
+        return ResponseEntity
+                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
                 .body(entityModel);
     }
 
     @Override
     public ResponseEntity<?> findById(Long id) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName(); // Get username directly
+        String username = authentication.getName();
 
         User authenticatedUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Employee employee = repository.findById(id) //
+        Employee employee = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee with ID " + id + " not found."));
 
         if (!authenticatedUser.getRole().equals("ROLE_ADMIN")
@@ -84,33 +87,31 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public EntityModel<EmployeeDTO> findByEmail(String email) {
-        Employee employee = repository.findByEmail(email) //
-                .orElseThrow(() -> new ResourceNotFoundException("Employee with EMAIL "+email+" not found."));
+        Employee employee = repository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with EMAIL " + email + " not found."));
         return assembler.toModel(EmployeeMapper.toDTO(employee));
     }
 
     @Override
     public ResponseEntity<?> save(EmployeeDTO newEmployee, Long id) {
         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
-                .orElseThrow(() -> new ResourceNotFoundException("Department with Name "+ newEmployee.getDepartmentName() + " not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("Department with Name " + newEmployee.getDepartmentName() + " not found."));
 
-        Employee newEmploye = EmployeeMapper.toEntity(newEmployee, dep);
-        Employee updatedEmployee = repository.findById(id) //
+        Employee newEmploye = EmployeeMapper.toEntity(newEmployee, dep, passwordEncoder, userRepository);
+        Employee updatedEmployee = repository.findById(id)
                 .map(employee -> {
                     employee.setName(newEmployee.getName());
                     employee.setRole(newEmployee.getRole());
                     employee.setEmail(newEmployee.getEmail());
                     employee.setDepartment(dep);
                     return repository.save(employee);
-                }) //
-                .orElseGet(() -> {
-                    return repository.save(newEmploye);
-                });
+                })
+                .orElseGet(() -> repository.save(newEmploye));
 
         EntityModel<EmployeeDTO> entityModel = assembler.toModel(EmployeeMapper.toDTO(updatedEmployee));
 
-        return ResponseEntity //
-                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri()) //
+        return ResponseEntity
+                .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
                 .body(entityModel);
     }
 
@@ -119,5 +120,4 @@ public class EmployeeServiceImpl implements EmployeeService {
         repository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
-
 }
