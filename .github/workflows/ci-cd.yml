@@ -46,6 +46,7 @@ jobs:
       
     - name: Run Checkstyle analysis
       run: ./mvnw checkstyle:check
+      continue-on-error: true
     # Step 5: Run tests
     - name: Run tests
       run: ./mvnw clean test

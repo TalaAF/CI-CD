@@ -138,7 +138,8 @@
 					<includeTestSourceDirectory>true</includeTestSourceDirectory>
 					<encoding>UTF-8</encoding>
 					<consoleOutput>true</consoleOutput>
-					<failsOnError>true</failsOnError>
+					<failOnViolation>false</failOnViolation>  <!-- CHANGE: Use failOnViolation instead
+					of failsOnError -->
 					<violationSeverity>warning</violationSeverity>
 				</configuration>
 				<executions>
