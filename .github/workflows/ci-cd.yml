@@ -33,7 +33,7 @@ jobs:
         
     # Step 3: Cache Maven dependencies for faster builds
     - name: Cache Maven dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -54,7 +54,7 @@ jobs:
       
     # Step 7: Upload build artifacts
     - name: Upload JAR artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: application-jar
         path: target/*.jar
@@ -72,7 +72,7 @@ jobs:
       
     # Download the JAR file built in previous job
     - name: Download JAR artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: application-jar
         path: target/
