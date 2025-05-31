@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.example.payroll.employeeService.Employee;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 
 import jakarta.persistence.CascadeType;
@@ -22,6 +23,7 @@ public class Department {
     private String location;
 
     @OneToMany(mappedBy="department", cascade = CascadeType.ALL)
+    @JsonIgnore
     private Set<Employee> employees;
 
     public Department() {}
