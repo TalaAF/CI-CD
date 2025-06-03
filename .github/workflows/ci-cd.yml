@@ -1,6 +1,6 @@
 name: CI/CD Pipeline
 
-# When should this pipeline run?
+# When should this pipeline run??
 on:
   push:
     branches: [ main, develop ]
