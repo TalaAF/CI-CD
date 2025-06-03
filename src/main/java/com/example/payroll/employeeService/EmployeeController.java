@@ -46,6 +46,12 @@ class EmployeeController {
     return employeeService.findByEmail(email);
   }
 
+  @GetMapping("/employees/name/{name}")
+  EntityModel<EmployeeDTO> getEmployeeByName(@PathVariable String name) {
+    return employeeService.findByName(name);
+  }
+
+
   @PutMapping("/employees/{id}")
   ResponseEntity<?> replaceEmployee(@RequestBody EmployeeDTO newEmployee, @PathVariable Long id) {
     return ResponseEntity.ok(employeeService.save(newEmployee, id));    
