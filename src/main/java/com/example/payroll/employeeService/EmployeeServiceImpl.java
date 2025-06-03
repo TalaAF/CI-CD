@@ -93,6 +93,13 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    public EntityModel<EmployeeDTO> findByName(String name) {
+        Employee employee = repository.findByName(name)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with NAME " + name + " not found."));
+        return assembler.toModel(EmployeeMapper.toDTO(employee));
+    }
+
+    @Override
     public ResponseEntity<?> save(EmployeeDTO newEmployee, Long id) {
         Department dep = departmentRepository.findByName(newEmployee.getDepartmentName())
                 .orElseThrow(() -> new ResourceNotFoundException("Department with Name " + newEmployee.getDepartmentName() + " not found."));

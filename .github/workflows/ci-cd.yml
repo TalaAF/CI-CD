@@ -1,23 +1,40 @@
 name: CI/CD Pipeline
 
-# When should this pipeline run?
+# When should this pipeline run??
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual triggering
+    inputs:
+      rollback:
+        description: 'Rollback to previous version'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+        - 'false'
+        - 'true'
+      target_revision:
+        description: 'Target revision number (for rollback)'
+        required: false
+        default: '2'
+        type: string
 
 # Environment variables
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: spring-boot-payroll
+  ECR_REPOSITORY: spring-boot-rest-service
+  ECS_CLUSTER: spring-boot-cluster
+  ECS_SERVICE: spring-boot-rest-service-service-uzxiwz56
   
 jobs:
   # Job 1: Build and Test
   build-and-test:
     name: Build and Test Application
     runs-on: ubuntu-latest
+    if: github.event.inputs.rollback != 'true'
     
     steps:
     # Step 1: Get the source code
@@ -44,6 +61,11 @@ jobs:
     - name: Make mvnw executable
       run: chmod +x ./mvnw
       
+    # Step 4.5: Run Checkstyle analysis (your addition!)
+    - name: Run Checkstyle analysis
+      run: ./mvnw checkstyle:check
+      continue-on-error: true
+      
     # Step 5: Run tests
     - name: Run tests
       run: ./mvnw clean test
@@ -59,12 +81,16 @@ jobs:
         name: application-jar
         path: target/*.jar
 
-  # Job 2: Build Docker Image (only for main branch)
-  build-docker:
-    name: Build Docker Image
+  # Job 2: Build Docker Image and Push to ECR (only for main branch)
+  build-and-push-docker:
+    name: Build Docker Image and Push to ECR
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event.inputs.rollback != 'true'
+    
+    outputs:
+      image-tag: ${{ steps.build-image.outputs.image-tag }}
+      image-uri: ${{ steps.build-image.outputs.image-uri }}
     
     steps:
     - name: Checkout repository
@@ -77,34 +103,212 @@ jobs:
         name: application-jar
         path: target/
         
-    # Build Docker image
-    - name: Build Docker image
-      run: |
-        docker build -t payroll-app:${{ github.sha }} .
-        docker build -t payroll-app:latest .
-        echo "Docker image built successfully!"
-        
-    # List the image to verify
-    - name: Verify Docker image
-      run: docker images payroll-app
+    # Configure AWS credentials with session token support
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ secrets.AWS_REGION }}
 
-  # Job 3: Notify on completion
+    # Login to Amazon ECR
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # Build, tag, and push image to Amazon ECR
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        echo "Building Docker image..."
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "Pushing image to ECR..."
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "✅ Image pushed successfully!"
+        echo "Image URI: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "Latest URI: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+        
+        # Set outputs for next jobs
+        echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "image-uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # Job 3: Deploy to ECS (NEW)
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker
+    if: github.ref == 'refs/heads/main' && github.event.inputs.rollback != 'true'
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Update ECS service with new image
+      run: |
+        echo "🚀 Deploying new image to ECS..."
+        echo "Image: ${{ needs.build-and-push-docker.outputs.image-uri }}"
+        echo "Tag: ${{ needs.build-and-push-docker.outputs.image-tag }}"
+        
+        # Force new deployment to pick up latest image
+        aws ecs update-service \
+          --cluster $ECS_CLUSTER \
+          --service $ECS_SERVICE \
+          --force-new-deployment \
+          --query 'service.serviceName' \
+          --output text
+        
+        echo "✅ Deployment initiated successfully!"
+
+    - name: Wait for deployment to stabilize
+      run: |
+        echo "⏳ Waiting for deployment to complete..."
+        aws ecs wait services-stable \
+          --cluster $ECS_CLUSTER \
+          --services $ECS_SERVICE
+        
+        echo "✅ Deployment completed and stable!"
+
+  # Job 4: Rollback (NEW - only runs when manually triggered)
+  rollback:
+    name: Rollback to Previous Version
+    runs-on: ubuntu-latest
+    if: github.event.inputs.rollback == 'true'
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Get current task definition
+      id: current-task-def
+      run: |
+        CURRENT_TASK_DEF=$(aws ecs describe-services \
+          --cluster $ECS_CLUSTER \
+          --services $ECS_SERVICE \
+          --query 'services[0].taskDefinition' \
+          --output text)
+        echo "current-task-def=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
+        echo "📍 Current task definition: $CURRENT_TASK_DEF"
+
+    - name: List available task definitions
+      run: |
+        echo "📋 Available task definition revisions:"
+        aws ecs list-task-definitions \
+          --family-prefix spring-boot-rest-service \
+          --status ACTIVE \
+          --sort DESC \
+          --max-items 5 \
+          --query 'taskDefinitionArns[*]' \
+          --output table
+
+    - name: Rollback to specified revision
+      run: |
+        TARGET_REVISION="${{ github.event.inputs.target_revision }}"
+        TARGET_TASK_DEF="arn:aws:ecs:us-east-1:036108960461:task-definition/spring-boot-rest-service:$TARGET_REVISION"
+        
+        echo "⚠️  ROLLBACK INITIATED"
+        echo "🎯 Rolling back to revision: $TARGET_REVISION"
+        echo "📝 Target task definition: $TARGET_TASK_DEF"
+        
+        # Update service to use target revision
+        aws ecs update-service \
+          --cluster $ECS_CLUSTER \
+          --service $ECS_SERVICE \
+          --task-definition $TARGET_TASK_DEF \
+          --query 'service.serviceName' \
+          --output text
+        
+        echo "✅ Rollback initiated successfully!"
+
+    - name: Monitor rollback deployment
+      run: |
+        echo "📊 Monitoring rollback deployment..."
+        aws ecs wait services-stable \
+          --cluster $ECS_CLUSTER \
+          --services $ECS_SERVICE
+        
+        echo "✅ Rollback completed successfully!"
+
+  # Job 5: Enhanced notifications
   notify:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: [build-and-test, build-docker]
+    needs: [build-and-test, build-and-push-docker, deploy, rollback]
     if: always()
     
     steps:
     - name: Notify success
-      if: needs.build-and-test.result == 'success'
+      if: ${{ (needs.build-and-test.result == 'success' || needs.build-and-test.result == 'skipped') && (needs.build-and-push-docker.result == 'success' || needs.build-and-push-docker.result == 'skipped') && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped') && (needs.rollback.result == 'success' || needs.rollback.result == 'skipped') }}
       run: |
-        echo "✅ Build and tests completed successfully!"
-        echo "Branch: ${{ github.ref_name }}"
-        echo "Commit: ${{ github.sha }}"
+        echo "✅ Pipeline completed successfully!"
+        echo "🚀 Deployment Details:"
+        echo "  Branch: ${{ github.ref_name }}"
+        echo "  Commit: ${{ github.sha }}"
+        echo "  Author: ${{ github.actor }}"
+        
+        if [ "${{ needs.build-and-test.result }}" = "success" ]; then
+          echo "✅ Build and tests passed"
+          echo "✅ Checkstyle analysis completed"
+        fi
+        
+        if [ "${{ needs.build-and-push-docker.result }}" = "success" ]; then
+          echo "✅ Docker image pushed to ECR"
+          echo "  Image tag: ${{ needs.build-and-push-docker.outputs.image-tag }}"
+        fi
+        
+        if [ "${{ needs.deploy.result }}" = "success" ]; then
+          echo "✅ Deployed to ECS successfully"
+          echo "  Service: $ECS_SERVICE"
+          echo "  Cluster: $ECS_CLUSTER"
+        fi
+        
+        if [ "${{ needs.rollback.result }}" = "success" ]; then
+          echo "✅ Rollback completed successfully"
+          echo "  Target revision: ${{ github.event.inputs.target_revision }}"
+        fi
+        
+        echo ""
+        echo "🌐 Your application should be accessible at your ECS public IP:8080"
         
     - name: Notify failure
-      if: needs.build-and-test.result == 'failure'
+      if: ${{ needs.build-and-test.result == 'failure' || needs.build-and-push-docker.result == 'failure' || needs.deploy.result == 'failure' || needs.rollback.result == 'failure' }}
       run: |
-        echo "❌ Build or tests failed!"
-        echo "Please check the logs above for details."
+        echo "❌ Pipeline failed!"
+        echo "📊 Failure Details:"
+        echo "  Branch: ${{ github.ref_name }}"
+        echo "  Commit: ${{ github.sha }}"
+        echo "  Author: ${{ github.actor }}"
+        
+        if [ "${{ needs.build-and-test.result }}" = "failure" ]; then
+          echo "❌ Build, tests, or Checkstyle failed"
+        fi
+        if [ "${{ needs.build-and-push-docker.result }}" = "failure" ]; then
+          echo "❌ Docker build/push failed"
+        fi
+        if [ "${{ needs.deploy.result }}" = "failure" ]; then
+          echo "❌ ECS deployment failed"
+        fi
+        if [ "${{ needs.rollback.result }}" = "failure" ]; then
+          echo "❌ Rollback failed"
+        fi
+        
+        echo ""
+        echo "🔍 Please check the logs above for detailed error information."
